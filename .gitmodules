@@ -1,0 +1,6 @@
+[submodule "anoner"]
+	path = anoner
+	url = https://github.com/shokrydev/anoner
+[submodule "synpii"]
+	path = synpii
+	url = git@github.com:shokrydev/synpii.git
