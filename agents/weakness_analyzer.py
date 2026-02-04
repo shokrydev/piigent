@@ -130,6 +130,7 @@ class ExplorationPhase(str, Enum):
     HYPOTHESIS_GENERATION = "hypothesis_generation"
     TARGETED_TESTING = "targeted_testing"
     ROOT_CAUSE_ANALYSIS = "root_cause_analysis"
+    PROMPT_EVOLUTION = "prompt_evolution"  # NEW: Apply prompt mutations
     REPORT_GENERATION = "report_generation"
 
 
@@ -166,6 +167,17 @@ class WeaknessAnalyzerState(TypedDict):
 
     # Final output
     report: Optional[Dict]
+
+    # Prompt evolution settings (NEW)
+    enable_prompt_evolution: bool
+    genome_store_path: str
+    max_fixes_per_round: int
+
+    # Evolution tracking (NEW)
+    original_genome_id: Optional[str]
+    evolved_genome_id: Optional[str]
+    applied_mutations: List[Dict]
+    evolution_metrics: Dict[str, float]
 
 
 # =============================================================================
@@ -542,6 +554,15 @@ def generate_report(state: WeaknessAnalyzerState) -> Dict:
         "weaknesses": weaknesses,
         "recommendations": [],
         "per_entity_metrics": state["per_entity_metrics"],
+        # NEW: Evolution section
+        "evolution": {
+            "enabled": state.get("enable_prompt_evolution", True),
+            "original_genome_id": state.get("original_genome_id"),
+            "evolved_genome_id": state.get("evolved_genome_id"),
+            "mutations_applied": len(state.get("applied_mutations", [])),
+            "applied_mutations": state.get("applied_mutations", []),
+            "metrics": state.get("evolution_metrics", {}),
+        },
     }
 
     # Compile recommendations (prioritized)
@@ -564,24 +585,185 @@ def generate_report(state: WeaknessAnalyzerState) -> Dict:
         "messages": [{
             "role": "assistant",
             "content": f"Analysis complete. Found {len(weaknesses)} weaknesses. "
-                      f"Generated {len(report['recommendations'])} recommendations."
+                      f"Generated {len(report['recommendations'])} recommendations. "
+                      f"Evolved genome: {state.get('evolved_genome_id', 'N/A')}"
         }]
     }
+
+
+def run_prompt_evolution(state: WeaknessAnalyzerState) -> Dict:
+    """Apply prompt evolution based on discovered weaknesses.
+    
+    Maps weaknesses to mutations, applies them via MutationEngine,
+    verifies improvements with VerificationAgent, and stores
+    successful genomes.
+    """
+    from agents.weakness_to_mutation import WeaknessToMutationMapper
+    from agents.fix_proposal import FixProposalAgent
+    from agents.verification import VerificationAgent, TestCase as VerificationTestCase
+    from prompts.store import PromptGenomeStore
+    from prompts.mutations import MutationEngine, create_mutation_from_fix
+    
+    # Check if evolution is enabled
+    if not state.get("enable_prompt_evolution", True):
+        return {
+            "current_phase": ExplorationPhase.REPORT_GENERATION,
+            "messages": [{"role": "assistant", "content": "Prompt evolution disabled, skipping."}]
+        }
+    
+    weaknesses = state.get("identified_weaknesses", [])
+    if not weaknesses:
+        return {
+            "current_phase": ExplorationPhase.REPORT_GENERATION,
+            "messages": [{"role": "assistant", "content": "No weaknesses to evolve prompts for."}]
+        }
+    
+    # Initialize components
+    store_path = state.get("genome_store_path", "prompt_genomes.db")
+    max_fixes = state.get("max_fixes_per_round", 3)
+    
+    try:
+        store = PromptGenomeStore(store_path)
+        mapper = WeaknessToMutationMapper(max_mutations_per_weakness=2)
+        mutation_engine = MutationEngine()
+        verification_agent = VerificationAgent()
+        fix_proposal_agent = FixProposalAgent()
+        
+        # Load or create base genome
+        genome = store.get_best() or store.ensure_default_exists()
+        original_genome_id = genome.genome_id
+        
+        logger.info(f"Starting evolution from genome: {original_genome_id}")
+        
+        # Map weaknesses to mutations
+        all_proposals = mapper.map_weaknesses_batch(weaknesses, max_total_mutations=max_fixes * 2)
+        
+        # Also generate proposals from evidence via FixProposalAgent
+        for weakness in weaknesses[:3]:  # Top 3 weaknesses
+            evidence = weakness.get("evidence", [])
+            if evidence:
+                errors = mapper.convert_evidence_to_errors(evidence, weakness["entity_type"])
+                if errors:
+                    fix_proposals = fix_proposal_agent.propose_fixes(errors, genome)
+                    all_proposals.extend(fix_proposals[:2])
+        
+        # Sort by priority and take top N
+        all_proposals.sort(key=lambda p: (p.priority, -p.estimated_impact))
+        proposals_to_try = all_proposals[:max_fixes]
+        
+        # Convert test cases from state to verification format
+        test_cases = []
+        for tc_dict in state.get("test_cases", []):
+            test_cases.append(VerificationTestCase(
+                text=tc_dict.get("text", ""),
+                expected_entities=[
+                    {"entity_type": et, "text": val}
+                    for et, vals in tc_dict.get("expected", {}).items()
+                    for val in (vals if isinstance(vals, list) else [vals])
+                ],
+            ))
+        
+        # Apply mutations cumulatively, keeping only improvements
+        applied_mutations = []
+        current_genome = genome
+        
+        for proposal in proposals_to_try:
+            try:
+                # Apply mutation
+                operator, params = create_mutation_from_fix(proposal)
+                mutated_genome = mutation_engine.apply_mutation(
+                    current_genome, operator, params
+                )
+                
+                # Verify if we have test cases
+                if test_cases:
+                    result = verification_agent.verify_fix(
+                        original_prompt=current_genome,
+                        fixed_prompt=mutated_genome,
+                        test_cases=test_cases,
+                    )
+                    
+                    if result.improved and not result.regression_detected:
+                        # Improvement confirmed
+                        current_genome = mutated_genome
+                        applied_mutations.append({
+                            "mutation": proposal.mutation.value,
+                            "target": proposal.target,
+                            "rationale": proposal.rationale,
+                            "delta_f1": result.delta_f1,
+                        })
+                        logger.info(f"Applied mutation: {proposal.mutation.value} for {proposal.target}")
+                else:
+                    # No test cases, apply mutation optimistically
+                    current_genome = mutated_genome
+                    applied_mutations.append({
+                        "mutation": proposal.mutation.value,
+                        "target": proposal.target,
+                        "rationale": proposal.rationale,
+                        "delta_f1": 0.0,  # Unknown without verification
+                    })
+                    
+            except Exception as e:
+                logger.warning(f"Failed to apply mutation {proposal.mutation.value}: {e}")
+                continue
+        
+        # Save evolved genome if we made changes
+        evolved_genome_id = None
+        evolution_metrics = {}
+        
+        if applied_mutations:
+            # Update genome metadata
+            current_genome.generation += 1
+            current_genome.parent_id = original_genome_id
+            store.save(current_genome)
+            evolved_genome_id = current_genome.genome_id
+            
+            evolution_metrics = {
+                "mutations_attempted": len(proposals_to_try),
+                "mutations_applied": len(applied_mutations),
+                "total_delta_f1": sum(m.get("delta_f1", 0) for m in applied_mutations),
+            }
+            
+            logger.info(f"Evolved genome saved: {evolved_genome_id}")
+        
+        return {
+            "current_phase": ExplorationPhase.REPORT_GENERATION,
+            "original_genome_id": original_genome_id,
+            "evolved_genome_id": evolved_genome_id,
+            "applied_mutations": applied_mutations,
+            "evolution_metrics": evolution_metrics,
+            "messages": [{
+                "role": "assistant",
+                "content": f"Prompt evolution complete. Applied {len(applied_mutations)} mutations. "
+                          f"Evolved genome: {evolved_genome_id or 'No improvements found'}"
+            }]
+        }
+        
+    except Exception as e:
+        logger.error(f"Prompt evolution failed: {e}")
+        return {
+            "current_phase": ExplorationPhase.REPORT_GENERATION,
+            "applied_mutations": [],
+            "evolution_metrics": {"error": str(e)},
+            "messages": [{"role": "assistant", "content": f"Prompt evolution failed: {e}"}]
+        }
 
 
 # =============================================================================
 # Graph Construction
 # =============================================================================
 
-def route_after_root_cause(state: WeaknessAnalyzerState) -> Literal["hypothesis", "report"]:
-    """Decide whether to continue exploring or generate report."""
+def route_after_root_cause(state: WeaknessAnalyzerState) -> Literal["hypothesis", "evolution"]:
+    """Decide whether to continue exploring or proceed to evolution."""
     phase = state.get("current_phase")
 
     if phase == ExplorationPhase.REPORT_GENERATION:
-        return "report"
+        return "evolution"  # Go through evolution before report
+    if phase == ExplorationPhase.PROMPT_EVOLUTION:
+        return "evolution"
     if phase == ExplorationPhase.HYPOTHESIS_GENERATION:
         return "hypothesis"
-    return "report"
+    return "evolution"  # Default to evolution
 
 
 def create_weakness_analyzer_graph() -> StateGraph:
@@ -594,6 +776,7 @@ def create_weakness_analyzer_graph() -> StateGraph:
     graph.add_node("generate_hypothesis", generate_hypothesis)
     graph.add_node("targeted_tests", run_targeted_tests)
     graph.add_node("root_cause_analysis", analyze_root_cause)
+    graph.add_node("prompt_evolution", run_prompt_evolution)  # NEW node
     graph.add_node("generate_report", generate_report)
 
     # Add edges
@@ -609,10 +792,12 @@ def create_weakness_analyzer_graph() -> StateGraph:
         route_after_root_cause,
         {
             "hypothesis": "generate_hypothesis",
-            "report": "generate_report",
+            "evolution": "prompt_evolution",  # Route to evolution instead of report
         }
     )
 
+    # Evolution leads to report
+    graph.add_edge("prompt_evolution", "generate_report")
     graph.add_edge("generate_report", END)
 
     return graph.compile()
@@ -629,6 +814,10 @@ def analyze_weaknesses(
     use_ministral: bool = True,
     ministral_model: str = "ministral-3:8b",
     preset: str = "clinical",
+    # NEW: Prompt evolution parameters
+    enable_evolution: bool = True,
+    genome_store_path: str = "prompt_genomes.db",
+    max_fixes_per_round: int = 3,
 ) -> Dict:
     """Run weakness analysis on the anonymization pipeline.
 
@@ -641,9 +830,12 @@ def analyze_weaknesses(
         use_ministral: Enable Ministral LLM recognizer.
         ministral_model: Ollama model name.
         preset: Recognizer preset.
+        enable_evolution: Enable automatic prompt evolution based on weaknesses.
+        genome_store_path: Path to the genome store database.
+        max_fixes_per_round: Maximum mutations to attempt per round.
 
     Returns:
-        Weakness analysis report.
+        Weakness analysis report with evolution section.
     """
     graph = create_weakness_analyzer_graph()
 
@@ -665,6 +857,14 @@ def analyze_weaknesses(
         "test_results": [],
         "messages": [],
         "report": None,
+        # NEW: Evolution settings
+        "enable_prompt_evolution": enable_evolution,
+        "genome_store_path": genome_store_path,
+        "max_fixes_per_round": max_fixes_per_round,
+        "original_genome_id": None,
+        "evolved_genome_id": None,
+        "applied_mutations": [],
+        "evolution_metrics": {},
     }
 
     result = graph.invoke(initial_state)
@@ -702,6 +902,31 @@ def print_report(report: Dict) -> None:
 
     for i, rec in enumerate(report["recommendations"], 1):
         print(f"\n{i}. [P{rec['priority']}] {rec['entity_type']}: {rec['fix'][:80]}...")
+
+    # NEW: Evolution section
+    if "evolution" in report:
+        print("\n" + "-" * 70)
+        print("PROMPT EVOLUTION")
+        print("-" * 70)
+        
+        evolution = report["evolution"]
+        print(f"\nEnabled: {evolution.get('enabled', True)}")
+        print(f"Original Genome: {evolution.get('original_genome_id', 'N/A')}")
+        print(f"Evolved Genome: {evolution.get('evolved_genome_id', 'N/A')}")
+        print(f"Mutations Applied: {evolution.get('mutations_applied', 0)}")
+        
+        if evolution.get("applied_mutations"):
+            print("\nApplied Mutations:")
+            for i, m in enumerate(evolution["applied_mutations"], 1):
+                print(f"  {i}. [{m['mutation']}] {m['target']}: {m.get('rationale', '')[:50]}...")
+        
+        if "metrics" in evolution and evolution["metrics"]:
+            metrics = evolution["metrics"]
+            if "error" not in metrics:
+                print(f"\nMetrics:")
+                print(f"  Mutations Attempted: {metrics.get('mutations_attempted', 0)}")
+                print(f"  Mutations Applied: {metrics.get('mutations_applied', 0)}")
+                print(f"  Total Delta F1: {metrics.get('total_delta_f1', 0):.4f}")
 
     print("\n" + "=" * 70)
 
