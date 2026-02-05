@@ -12,7 +12,7 @@ class TestSafeguardsModule:
         detector = OverfittingDetector()
         # Mocking check for simple logic test or using check_overfitting with dummies
         report = detector.check_overfitting(
-            pipeline=lambda x: [],
+            flow_runner=lambda x: {"detected_entities": []},
             synthetic_samples=[{"text": "A", "entities": []}],
             real_samples=[{"text": "B", "entities": []}]
         )

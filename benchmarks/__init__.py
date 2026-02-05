@@ -1,4 +1,4 @@
-"""Benchmarking tools for PIIgent pipeline.
+"""Benchmarking tools for PIIgent flow.
 
 Note: Document generation now uses SynPII. Import directly:
     from synpii import SynPII

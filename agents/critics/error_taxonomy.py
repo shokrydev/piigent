@@ -55,7 +55,7 @@ class ErrorTaxonomyAgent:
     """Agent that classifies errors into systematic categories.
 
     Analyzes detection errors to identify patterns and root causes,
-    enabling targeted improvements to the detection pipeline.
+    enabling targeted improvements to the detection flow.
 
     Example:
         agent = ErrorTaxonomyAgent()

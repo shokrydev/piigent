@@ -1,6 +1,6 @@
 # PIIgent: Agentic Weakness Discovery for PII Detection
 
-A **LangGraph-based system** for systematically discovering and explaining anonymization failures in German clinical text. PIIgent uses iterative hypothesis-test loops and self-critique mechanisms to understand *why* PII detection pipelines fail.
+A **LangGraph-based system** for systematically discovering and explaining anonymization failures in German clinical text. PIIgent uses iterative hypothesis-test loops and self-critique mechanisms to understand *why* PII detection flows fail.
 
 **This is a research exploration tool**, not a production anonymizer.
 
@@ -8,15 +8,16 @@ A **LangGraph-based system** for systematically discovering and explaining anony
 
 See [QUICKSTART.md](QUICKSTART.md) for installation and usage instructions.
 
-You can also run the included pipeline demos:
+You can also run the included flow demos:
 ```bash
-python .demo/run_agentic_flow.py
-python .demo/run_weakness_analysis.py
+# Simplified run commands (uv handles dependencies automatically)
+uv run demo/run_agentic_flow.py
+uv run demo/run_weakness_analysis.py
 ```
 
 ## The Problem
 
-Empirical testing shows that even well-tuned PII detection pipelines achieve only ~76-78% recall on German clinical text. The problem is structural: naive single-pass pipelines cannot resolve conflicts between overlapping entities (e.g., ZIP codes vs. Locations) or handle subtle context dependencies.
+Empirical testing shows that even well-tuned PII detection flows achieve only ~76-78% recall on German clinical text. The problem is structural: naive single-pass flows cannot resolve conflicts between overlapping entities (e.g., ZIP codes vs. Locations) or handle subtle context dependencies.
 
 PIIgent uses an iterative, agentic approach to:
 1. **Reason** about entity conflicts
@@ -83,9 +84,9 @@ piigent/
 ├── evaluation/             # Multi-Dimensional Evaluation
 ├── curriculum/             # Curriculum Learning
 ├── components/             # Core analysis components (parsers, resolvers)
-├── graph/                  # LangGraph workflow
+├── graph/                  # LangGraph flow definitions
 ├── docs/                   # Detailed documentation & research notes
-├── .demo/                  # Runnable demo scripts
+├── demo/                   # Runnable demo scripts
 ├── anoner/                 # Custom Presidio fork (submodule)
 └── synpii/                 # Synthetic PII generator (submodule)
 ```

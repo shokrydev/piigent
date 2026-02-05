@@ -47,7 +47,7 @@ class HITLTrigger(str, Enum):
 
 
 class AutonomyMode(str, Enum):
-    """Autonomy modes for the pipeline."""
+    """Autonomy modes for the flow."""
     AUTONOMOUS = "autonomous"       # No human intervention
     SUPERVISED = "supervised"       # Human reviews flagged cases
     INTERACTIVE = "interactive"     # Human validates each decision

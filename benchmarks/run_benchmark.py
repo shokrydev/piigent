@@ -32,7 +32,7 @@ def run_benchmark(
     use_gliner: bool = False,
     confidence_threshold: float = 0.7,
 ) -> dict:
-    """Run pipeline on documents and calculate metrics.
+    """Run flow on documents and calculate metrics.
 
     Args:
         documents: List of document dicts with 'text' and 'annotations'.

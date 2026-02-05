@@ -18,11 +18,11 @@ class TestEvaluationModule:
         db_path = tmp_path / "regression.db"
         suite = RegressionTestSuite(str(db_path))
         
-        # Mock pipeline function
-        def mock_pipeline(text):
+        # Mock flow function
+        def mock_flow(text):
             return {"entities": []}
             
-        report = suite.run_regression_check(mock_pipeline)
+        report = suite.run_regression_check(mock_flow)
         assert report.passed is not None
 
     def test_disagreement_evaluator(self):

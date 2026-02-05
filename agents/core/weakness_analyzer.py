@@ -9,7 +9,7 @@ This agent implements an exploratory loop:
 
 This is a LangGraph agent that uses tool calls to:
 - Generate synthetic documents
-- Run detection pipeline
+- Run detection flow
 - Analyze results
 - Decide next exploration step
 """
@@ -819,14 +819,14 @@ def analyze_weaknesses(
     genome_store_path: str = "prompt_genomes.db",
     max_fixes_per_round: int = 3,
 ) -> Dict:
-    """Run weakness analysis on the anonymization pipeline.
+    """Run weakness analysis on the anonymization flow.
 
     Uses SynPII for grammar-aware synthetic document and test case generation.
 
     Args:
         num_docs: Number of documents for initial benchmark.
         max_rounds: Maximum exploration rounds.
-        confidence_threshold: Pipeline confidence threshold.
+        confidence_threshold: Flow confidence threshold.
         use_ministral: Enable Ministral LLM recognizer.
         ministral_model: Ollama model name.
         preset: Recognizer preset.

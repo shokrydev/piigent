@@ -1,4 +1,4 @@
-"""LangGraph pipeline definitions for PII detection and anonymization."""
+"""LangGraph flow definitions for PII detection and anonymization."""
 
 from .state import FlowState, DetectedEntity
 

@@ -31,7 +31,7 @@ class OverfittingDetector:
         detector = OverfittingDetector()
 
         report = detector.check_overfitting(
-            pipeline=pipeline,
+            flow_runner=run_flow,
             synthetic_samples=synthetic_docs,
             real_samples=real_docs,
         )
@@ -58,14 +58,14 @@ class OverfittingDetector:
 
     def check_overfitting(
         self,
-        pipeline: Callable[[str], List[Dict]],
+        flow_runner: Callable[[str], Dict],
         synthetic_samples: List[Dict],
         real_samples: List[Dict],
     ) -> OverfittingReport:
         """Check for overfitting by comparing synthetic vs real performance.
 
         Args:
-            pipeline: Detection pipeline function
+            flow_runner: Function that runs the flow and returns final state dict
             synthetic_samples: Synthetic test samples with 'text' and 'entities'
             real_samples: Real test samples with 'text' and 'entities'
 
@@ -73,10 +73,10 @@ class OverfittingDetector:
             OverfittingReport with analysis
         """
         # Evaluate on synthetic
-        synthetic_metrics = self._evaluate(pipeline, synthetic_samples)
+        synthetic_metrics = self._evaluate(flow_runner, synthetic_samples)
 
         # Evaluate on real
-        real_metrics = self._evaluate(pipeline, real_samples)
+        real_metrics = self._evaluate(flow_runner, real_samples)
 
         # Calculate gaps
         gap = {}
@@ -119,10 +119,10 @@ class OverfittingDetector:
 
     def _evaluate(
         self,
-        pipeline: Callable,
+        flow_runner: Callable,
         samples: List[Dict],
     ) -> MultiDimensionalMetrics:
-        """Evaluate pipeline on samples."""
+        """Evaluate flow on samples."""
         expected_all = []
         detected_all = []
 
@@ -131,9 +131,8 @@ class OverfittingDetector:
             expected = sample.get("entities", [])
 
             try:
-                detected = pipeline(text)
-                if not isinstance(detected, list):
-                    detected = detected.get("entities", []) if isinstance(detected, dict) else []
+                result = flow_runner(text)
+                detected = result.get("detected_entities", [])
             except Exception:
                 detected = []
 

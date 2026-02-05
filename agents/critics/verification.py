@@ -78,7 +78,7 @@ class VerificationAgent:
         original_prompt: PromptGenotype,
         fixed_prompt: PromptGenotype,
         test_cases: List[TestCase],
-        pipeline_factory: Optional[Callable[[PromptGenotype], Callable]] = None,
+        flow_factory: Optional[Callable[[PromptGenotype], Callable]] = None,
     ) -> VerificationResult:
         """Verify whether a fix improves performance.
 
@@ -86,23 +86,23 @@ class VerificationAgent:
             original_prompt: The original prompt genome
             fixed_prompt: The fixed prompt genome
             test_cases: Test cases to evaluate on
-            pipeline_factory: Function that creates pipeline from genome
+            flow_factory: Function that creates flow from genome
 
         Returns:
             VerificationResult with recommendation
         """
-        # Create pipelines for both prompts
-        if pipeline_factory:
-            original_pipeline = pipeline_factory(original_prompt)
-            fixed_pipeline = pipeline_factory(fixed_prompt)
+        # Create flows for both prompts
+        if flow_factory:
+            original_flow = flow_factory(original_prompt)
+            fixed_flow = flow_factory(fixed_prompt)
         else:
             # Use default evaluation
-            original_pipeline = self._create_default_pipeline(original_prompt)
-            fixed_pipeline = self._create_default_pipeline(fixed_prompt)
+            original_flow = self._create_default_flow(original_prompt)
+            fixed_flow = self._create_default_flow(fixed_prompt)
 
         # Run evaluation
-        original_metrics = self._evaluate(original_pipeline, test_cases)
-        new_metrics = self._evaluate(fixed_pipeline, test_cases)
+        original_metrics = self._evaluate(original_flow, test_cases)
+        new_metrics = self._evaluate(fixed_flow, test_cases)
 
         # Calculate deltas
         delta_f1 = new_metrics.exact_f1 - original_metrics.exact_f1
@@ -116,8 +116,8 @@ class VerificationAgent:
         regression_detected = False
         regression_details = []
 
-        if self.regression_suite and fixed_pipeline:
-            regression_report = self.regression_suite.run_regression_check(fixed_pipeline)
+        if self.regression_suite and fixed_flow:
+            regression_report = self.regression_suite.run_regression_check(fixed_flow)
             regression_detected = not regression_report.passed
             regression_details = regression_report.regressions
 
@@ -149,7 +149,7 @@ class VerificationAgent:
         fixes: List[ProposedFix],
         test_cases: List[TestCase],
         apply_fix_fn: Callable[[ProposedFix, PromptGenotype], PromptGenotype],
-        pipeline_factory: Optional[Callable[[PromptGenotype], Callable]] = None,
+        flow_factory: Optional[Callable[[PromptGenotype], Callable]] = None,
     ) -> List[Tuple[ProposedFix, VerificationResult]]:
         """Verify multiple fixes and return results.
 
@@ -158,7 +158,7 @@ class VerificationAgent:
             fixes: List of proposed fixes
             test_cases: Test cases
             apply_fix_fn: Function to apply fix to genome
-            pipeline_factory: Pipeline factory function
+            flow_factory: Flow factory function
 
         Returns:
             List of (fix, verification_result) tuples
@@ -171,7 +171,7 @@ class VerificationAgent:
                 original_prompt=original_prompt,
                 fixed_prompt=fixed_prompt,
                 test_cases=test_cases,
-                pipeline_factory=pipeline_factory,
+                flow_factory=flow_factory,
             )
             results.append((fix, result))
 
@@ -183,7 +183,7 @@ class VerificationAgent:
         fixes: List[ProposedFix],
         test_cases: List[TestCase],
         apply_fix_fn: Callable[[ProposedFix, PromptGenotype], PromptGenotype],
-        pipeline_factory: Optional[Callable[[PromptGenotype], Callable]] = None,
+        flow_factory: Optional[Callable[[PromptGenotype], Callable]] = None,
     ) -> Tuple[PromptGenotype, List[Tuple[ProposedFix, VerificationResult]]]:
         """Apply and verify fixes cumulatively, keeping only improvements.
 
@@ -192,7 +192,7 @@ class VerificationAgent:
             fixes: List of proposed fixes (should be priority-sorted)
             test_cases: Test cases
             apply_fix_fn: Function to apply fix
-            pipeline_factory: Pipeline factory
+            flow_factory: Flow factory
 
         Returns:
             Tuple of (final_prompt, list of applied (fix, result))
@@ -206,7 +206,7 @@ class VerificationAgent:
                 original_prompt=current_prompt,
                 fixed_prompt=fixed_prompt,
                 test_cases=test_cases,
-                pipeline_factory=pipeline_factory,
+                flow_factory=flow_factory,
             )
 
             if result.recommendation == "accept":
@@ -217,13 +217,13 @@ class VerificationAgent:
 
     def _evaluate(
         self,
-        pipeline: Callable,
+        flow: Callable,
         test_cases: List[TestCase],
     ) -> MultiDimensionalMetrics:
-        """Evaluate pipeline on test cases.
+        """Evaluate flow on test cases.
 
         Args:
-            pipeline: Detection pipeline function
+            flow: Detection flow function
             test_cases: Test cases
 
         Returns:
@@ -234,7 +234,7 @@ class VerificationAgent:
 
         for case in test_cases:
             try:
-                detected = pipeline(case.text)
+                detected = flow(case.text)
                 if isinstance(detected, list):
                     detected_entities = detected
                 else:
@@ -251,26 +251,26 @@ class VerificationAgent:
             detected_entities=detected_all,
         )
 
-    def _create_default_pipeline(
+    def _create_default_flow(
         self,
         prompt: PromptGenotype,
     ) -> Callable:
-        """Create a simple evaluation pipeline.
+        """Create a simple evaluation flow.
 
-        This is a placeholder - in real use, pipeline_factory should be provided.
+        This is a placeholder - in real use, flow_factory should be provided.
         """
-        def mock_pipeline(text: str) -> List[Dict]:
+        def mock_flow(text: str) -> List[Dict]:
             # Return empty for mock - real implementation uses PromptManagedLLM
             return []
 
-        return mock_pipeline
+        return mock_flow
 
     def a_b_test(
         self,
         prompt_a: PromptGenotype,
         prompt_b: PromptGenotype,
         test_cases: List[TestCase],
-        pipeline_factory: Callable[[PromptGenotype], Callable],
+        flow_factory: Callable[[PromptGenotype], Callable],
         num_trials: int = 3,
     ) -> Dict:
         """Run A/B test between two prompts.
@@ -279,7 +279,7 @@ class VerificationAgent:
             prompt_a: First prompt (typically original)
             prompt_b: Second prompt (typically modified)
             test_cases: Test cases
-            pipeline_factory: Pipeline factory
+            flow_factory: Flow factory
             num_trials: Number of evaluation trials
 
         Returns:
@@ -289,11 +289,11 @@ class VerificationAgent:
         b_scores = []
 
         for _ in range(num_trials):
-            pipeline_a = pipeline_factory(prompt_a)
-            pipeline_b = pipeline_factory(prompt_b)
+            flow_a = flow_factory(prompt_a)
+            flow_b = flow_factory(prompt_b)
 
-            metrics_a = self._evaluate(pipeline_a, test_cases)
-            metrics_b = self._evaluate(pipeline_b, test_cases)
+            metrics_a = self._evaluate(flow_a, test_cases)
+            metrics_b = self._evaluate(flow_b, test_cases)
 
             a_scores.append(metrics_a.exact_f1)
             b_scores.append(metrics_b.exact_f1)

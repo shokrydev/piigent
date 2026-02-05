@@ -1,6 +1,6 @@
-"""Reflective Resolver Node.
+"""Reflective Resolver Agent.
 
-This node resolves overlapping entity detections using a hybrid approach:
+This agent resolves overlapping entity detections using a hybrid approach:
 1. Fast Path: Uses confidence scores and heuristic specificity for clear cases.
 2. Agentic Path: Uses an LLM to resolve ambiguous cases based on context.
 
@@ -138,45 +138,16 @@ Return ONLY the index number.
 """
         # Call LLM
         
-        # Option 1: Use Wrapper
-        if self.llm:
-            try:
-                recognizer = self.llm.create_recognizer()
-                # Assuming recognizer has a way to generate text or we access internal engine
-                # OllamaNERecognizer (from presidio-analyzer custom) doesn't expose raw generation easily
-                # typically. But we can import the engine if needed, or rely on wrapper method if exists.
-                # For now, let's assume we can access llm_engine if available or use requests directly.
-                if hasattr(recognizer, "llm_engine"):
-                     response = recognizer.llm_engine.generate_text(prompt)
-                else: 
-                     # Fallback to direct request if wrapper doesn't expose engine
-                     import requests
-                     payload = {
-                        "model": self.llm.model,
-                        "prompt": prompt,
-                        "stream": False
-                     }
-                     r = requests.post(f"{self.llm.ollama_url}/api/generate", json=payload)
-                     response = r.json().get("response", "")
-            except Exception as e:
-                logger.warning(f"Wrapper LLM call failed: {e}")
-                return None
-                
-        # Option 2: Use direct config
-        elif self.ollama_config:
-            try:
-                import requests
-                payload = {
-                    "model": self.ollama_config["model"],
-                    "prompt": prompt,
-                    "stream": False
-                }
-                r = requests.post(f"{self.ollama_config['url']}/api/generate", json=payload)
-                response = r.json().get("response", "")
-            except Exception as e:
-                logger.warning(f"Direct LLM call failed: {e}")
-                return None
-        else:
+        # Call LLM via AnonerWrapper
+        from wrappers.anoner_wrapper import AnonerWrapper
+        
+        url = self.ollama_config["url"] if self.ollama_config else self.llm.ollama_url
+        model = self.ollama_config["model"] if self.ollama_config else self.llm.model
+        
+        wrapper = AnonerWrapper(ollama_url=url, model=model)
+        response = wrapper.generate_text(prompt)
+
+        if not response:
             return None
 
         

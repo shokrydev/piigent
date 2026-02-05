@@ -107,23 +107,13 @@ class PromptManagedLLM:
         Returns:
             Configured OllamaNERecognizer instance
         """
-        # Import here to avoid circular dependency
-        try:
-            from presidio_analyzer.predefined_recognizers.ner import OllamaNERecognizer
-        except ImportError:
-            raise ImportError(
-                "OllamaNERecognizer not available. "
-                "Install from anoner/presidio-analyzer"
-            )
-
-        # Get genome to use
-        if genome_id:
-            genome = self.genome_store.get(genome_id)
-            if not genome:
-                logger.warning(f"Genome {genome_id} not found, using active")
-                genome = self.active_genome
-        else:
-            genome = self.active_genome
+        # Use AnonerWrapper to create the recognizer
+        from wrappers.anoner_wrapper import AnonerWrapper
+        
+        wrapper = AnonerWrapper(
+            ollama_url=self.ollama_url,
+            model=self.model,
+        )
 
         # Build prompts from genome
         system_prompt = genome.build_system_prompt()
@@ -131,18 +121,12 @@ class PromptManagedLLM:
             "de": genome.build_german_additions(),
         }
 
-        # Create recognizer with configured prompts
-        recognizer = OllamaNERecognizer(
-            ollama_url=self.ollama_url,
-            model=self.model,
-            supported_entities=supported_entities,
-            supported_language="de",
-            temperature=self.temperature,
-            timeout=self.timeout,
-            min_score=min_score,
+        # Create recognizer with configured prompts via factory
+        recognizer = wrapper.create_llm_recognizer(
             system_prompt=system_prompt,
             language_additions=language_additions,
-            name=f"PromptManaged_{genome.id[:20]}",
+            timeout=self.timeout,
+            threshold=min_score,
         )
 
         return recognizer

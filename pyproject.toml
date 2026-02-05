@@ -1,0 +1,24 @@
+[project]
+name = "piigent"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "gradio>=6.5.1",
+    "httpx>=0.28.1",
+    "langchain-core>=1.2.9",
+    "langgraph>=1.0.7",
+    "presidio-analyzer",
+    "pytest>=9.0.2",
+    "synpii",
+]
+
+[tool.uv.workspace]
+members = [
+    "anoner/presidio-analyzer",
+    "synpii",
+]
+
+[tool.uv.sources]
+presidio-analyzer = { workspace = true, editable = true }
+synpii = { workspace = true, editable = true }

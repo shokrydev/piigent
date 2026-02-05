@@ -1,4 +1,4 @@
-"""Shared state schema for the PIIgent pipeline."""
+"""Shared state schema for the PIIgent flow."""
 
 from typing import TypedDict, Annotated
 from dataclasses import dataclass
@@ -42,3 +42,5 @@ class FlowState(TypedDict):
     # Quality audit phase
     quality_report: dict
     leakage_detected: bool
+    retry_count: int
+    missed_entities: list[DetectedEntity]

@@ -46,7 +46,7 @@ def match_entities(
     """Match detected entities to ground truth annotations.
 
     Args:
-        detected: List of detected entities from pipeline.
+        detected: List of detected entities from flow.
         ground_truth: List of annotation dicts with entity_type, start, end.
         strict_type_match: If True, entity types must match exactly.
         overlap_threshold: Minimum overlap proportion for a match.
@@ -92,7 +92,7 @@ def calculate_metrics(
     """Calculate precision, recall, F1 for a single document.
 
     Args:
-        detected: Detected entities from pipeline.
+        detected: Detected entities from flow.
         ground_truth: Ground truth annotations.
         strict_type_match: Require entity types to match.
 

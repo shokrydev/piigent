@@ -9,7 +9,7 @@ Resolves overlapping entity detections using configurable strategies:
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple, Any
 
 
 class ResolutionStrategy(str, Enum):
@@ -289,6 +289,66 @@ class OverlapResolver:
     def _contains(self, outer: Dict, inner: Dict) -> bool:
         """Check if outer entity fully contains inner entity."""
         return self._get_val(outer, "start") <= self._get_val(inner, "start") and self._get_val(outer, "end") >= self._get_val(inner, "end")
+
+    def _build_overlap_cliques(self, entities: List[Any]) -> List[List[Any]]:
+        """Group overlapping entities into conflict cliques.
+
+        Args:
+            entities: List of DetectedEntity objects
+
+        Returns:
+            List of cliques (lists of overlapping entities)
+        """
+        if not entities:
+            return []
+
+        # Sort by start position
+        sorted_entities = sorted(entities, key=lambda e: self._get_val(e, "start"))
+        
+        cliques = []
+        if not sorted_entities:
+            return cliques
+
+        current_clique = [sorted_entities[0]]
+        current_end = self._get_val(sorted_entities[0], "end")
+
+        for i in range(1, len(sorted_entities)):
+            entity = sorted_entities[i]
+            # If this entity overlaps with the current clique's span
+            if self._get_val(entity, "start") < current_end:
+                current_clique.append(entity)
+                current_end = max(current_end, self._get_val(entity, "end"))
+            else:
+                # No overlap, start a new clique
+                cliques.append(current_clique)
+                current_clique = [entity]
+                current_end = self._get_val(entity, "end")
+
+        cliques.append(current_clique)
+        return cliques
+
+    def _resolve_clique(self, clique: List[Any]) -> Any:
+        """Resolve a conflict clique using the current strategy.
+
+        Args:
+            clique: List of overlapping entities
+
+        Returns:
+            The single entity to keep
+        """
+        if not clique:
+            return None
+        if len(clique) == 1:
+            return clique[0]
+
+        # Standard resolution: pick the best one by comparing iteratively
+        winner = clique[0]
+        for i in range(1, len(clique)):
+            # Force high overlap to ensure resolution
+            res = self._resolve_pair(winner, clique[i], 1.0)
+            if res == "keep_b":
+                winner = clique[i]
+        return winner
 
     def get_conflicts(self) -> List[OverlapConflict]:
         """Get all recorded conflicts."""

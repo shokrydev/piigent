@@ -1,4 +1,4 @@
-"""Pipeline agents for PII detection and anonymization.
+"""Flow agents for PII detection and anonymization.
 
 Includes:
 - Detection coordination and aggregation

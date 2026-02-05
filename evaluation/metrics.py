@@ -102,18 +102,25 @@ class MultiDimensionalMetrics:
             detected_set = set()
 
             for e in doc_expected:
-                expected_set.add((e.get("start"), e.get("end"), e.get("entity_type", e.get("type"))))
+                # Handle both dicts and objects
+                start = e.get("start") if isinstance(e, dict) else getattr(e, "start", 0)
+                end = e.get("end") if isinstance(e, dict) else getattr(e, "end", 0)
+                etype = e.get("entity_type", e.get("type")) if isinstance(e, dict) else getattr(e, "entity_type", "UNKNOWN")
+                expected_set.add((start, end, etype))
 
             for d in doc_detected:
-                entity_type = d.get("entity_type", d.get("type"))
-                detected_set.add((d.get("start"), d.get("end"), entity_type))
+                start = d.get("start") if isinstance(d, dict) else getattr(d, "start", 0)
+                end = d.get("end") if isinstance(d, dict) else getattr(d, "end", 0)
+                etype = d.get("entity_type", d.get("type")) if isinstance(d, dict) else getattr(d, "entity_type", "UNKNOWN")
+                score = d.get("score", 0.85) if isinstance(d, dict) else getattr(d, "score", 0.85)
+                
+                detected_set.add((start, end, etype))
 
                 # Track confidence for ECE
-                score = d.get("score", 0.85)
                 bin_idx = min(int(score * confidence_bins), confidence_bins - 1)
 
                 # Check if this detection is correct (exact match)
-                is_correct = (d.get("start"), d.get("end"), entity_type) in expected_set
+                is_correct = (start, end, etype) in expected_set
                 confidence_correct[bin_idx].append(is_correct)
                 confidence_values[bin_idx].append(score)
 
@@ -131,12 +138,14 @@ class MultiDimensionalMetrics:
             matched_detected = set()
 
             for exp in doc_expected:
-                exp_start, exp_end = exp.get("start"), exp.get("end")
-                exp_type = exp.get("entity_type", exp.get("type"))
+                exp_start = exp.get("start") if isinstance(exp, dict) else getattr(exp, "start", 0)
+                exp_end = exp.get("end") if isinstance(exp, dict) else getattr(exp, "end", 0)
+                exp_type = exp.get("entity_type", exp.get("type")) if isinstance(exp, dict) else getattr(exp, "entity_type", "UNKNOWN")
 
                 for det in doc_detected:
-                    det_start, det_end = det.get("start"), det.get("end")
-                    det_type = det.get("entity_type", det.get("type"))
+                    det_start = det.get("start") if isinstance(det, dict) else getattr(det, "start", 0)
+                    det_end = det.get("end") if isinstance(det, dict) else getattr(det, "end", 0)
+                    det_type = det.get("entity_type", det.get("type")) if isinstance(det, dict) else getattr(det, "entity_type", "UNKNOWN")
 
                     # Calculate overlap
                     overlap_start = max(exp_start, det_start)
@@ -168,10 +177,15 @@ class MultiDimensionalMetrics:
 
             # Type matching counts
             type_tp += len(matched_expected)
-            type_fn += len(set((e.get("start"), e.get("end"), e.get("entity_type", e.get("type")))
-                              for e in doc_expected) - matched_expected)
-            type_fp += len(set((d.get("start"), d.get("end"), d.get("entity_type", d.get("type")))
-                              for d in doc_detected) - matched_detected)
+            
+            # Helper to get attributes for comparison
+            def _get_entity_key(item):
+                 if isinstance(item, dict):
+                     return (item.get("start"), item.get("end"), item.get("entity_type", item.get("type")))
+                 return (item.start, item.end, item.entity_type)
+
+            type_fn += len(set(_get_entity_key(e) for e in doc_expected) - matched_expected)
+            type_fp += len(set(_get_entity_key(d) for d in doc_detected) - matched_detected)
 
             # Partial FP/FN (approximate)
             partial_fn += len(doc_expected) - len([e for e in doc_expected

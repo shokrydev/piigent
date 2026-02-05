@@ -1,6 +1,6 @@
-"""Multi-Step NER Pipeline.
+"""Multi-Step NER Flow.
 
-This module provides a sophisticated multi-step NER pipeline that:
+This module provides a sophisticated multi-step NER flow that:
 1. Parses documents into semantic sections
 2. Applies section-aware entity expectations
 3. Applies domain-specific rules

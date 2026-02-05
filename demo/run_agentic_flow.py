@@ -36,7 +36,7 @@ def main():
         print("-" * 50)
         
     except Exception as e:
-        print(f"Error running pipeline: {e}")
+        print(f"Error running flow: {e}")
         print("Note: Ensure dependencies are installed and specific models (like Ollama) are available if used.")
 
 if __name__ == "__main__":

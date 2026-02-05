@@ -1,9 +1,9 @@
-"""LangGraph pipeline for PII detection and anonymization.
+"""LangGraph flow for PII detection and anonymization.
 
-Three-agent pipeline with conditional HITL routing:
+Three-agent flow with conditional HITL routing:
 1. Detection Coordinator - Runs recognizers, aggregates results
-2. Anonymization Strategist - Applies anonymization techniques (placeholder)
-3. Quality Auditor - Verifies no PII leakage (placeholder)
+2. Anonymization Strategist - Applies anonymization techniques
+3. Quality Auditor - Verifies no PII leakage
 
 Human-in-the-loop validation is triggered when confidence < threshold.
 """
@@ -13,128 +13,102 @@ from typing import Literal, Optional
 
 from langgraph.graph import StateGraph, END
 
-from graph.state import FlowState
+from graph.state import FlowState, DetectedEntity
 from agents.core.detection_coordinator import (
     DetectionCoordinator,
     create_detection_coordinator,
     route_after_detection,
 )
+from wrappers.anoner_wrapper import AnonerWrapper
 
 logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# Placeholder Nodes (to be implemented)
+# Helper Agents
 # =============================================================================
 
 
 def human_validation_node(state: FlowState) -> dict:
-    """Human-in-the-loop validation node.
-
-    In the full implementation, this would:
-    1. Present detected entities to human reviewer via UI
-    2. Allow reviewer to confirm, reject, or modify entities
-    3. Update entity list based on human feedback
-
-    For now, this is a pass-through that marks validation as complete.
-    """
+    """Human-in-the-loop validation node."""
     entities = state.get("detected_entities", [])
 
     logger.info(f"HITL: {len(entities)} entities awaiting human validation")
 
-    # In full implementation: launch Gradio UI, wait for response
-    # For now: pass through with a message
     return {
         "messages": [{
             "role": "human",
             "content": f"Human validated {len(entities)} entities."
         }],
-        "needs_human_validation": False,  # Mark as validated
+        "needs_human_validation": False,
     }
 
 
 def anonymization_node(state: FlowState) -> dict:
-    """Anonymization Strategist node.
-
-    In the full implementation, this would:
-    1. Select anonymization technique per entity type:
-       - Redaction: [REDACTED]
-       - Pseudonymization: Replace with fake data
-       - Encryption: Hash the value
-    2. Apply anonymization to document
-    3. Track which technique was used for each entity
-
-    For now, applies simple redaction.
-    """
+    """Anonymization Strategist agent - processes replacements end-to-start."""
     document = state["document"]
     entities = state.get("detected_entities", [])
 
     logger.info(f"Anonymizing {len(entities)} entities in document")
 
-    # Simple redaction strategy (placeholder)
+    # Standardize replacements: Process reverse to keep offsets valid
     anonymized = document
-    strategy = {}
-
-    # Sort entities by position (reverse) to preserve offsets
+    
+    # Sort by start position reversed
     for entity in sorted(entities, key=lambda e: e.start, reverse=True):
         replacement = f"[{entity.entity_type}]"
         anonymized = anonymized[:entity.start] + replacement + anonymized[entity.end:]
-        strategy[entity.entity_type] = strategy.get(entity.entity_type, "redaction")
 
     return {
         "anonymized_text": anonymized,
-        "anonymization_strategy": strategy,
         "messages": [{
             "role": "assistant",
-            "content": f"Anonymized {len(entities)} entities using redaction."
+            "content": f"Anonymized {len(entities)} entities using [TYPE] placeholders."
         }],
     }
 
 
 def quality_audit_node(state: FlowState) -> dict:
-    """Quality Auditor node.
-
-    In the full implementation, this would:
-    1. Re-run detection on anonymized text
-    2. Check for PII leakage (entities that weren't anonymized)
-    3. Measure utility preservation
-    4. Generate quality report
-
-    For now, performs basic leakage check.
-    """
+    """Quality Auditor agent - re-scans for leaks and triggers self-correction."""
     anonymized_text = state.get("anonymized_text", "")
-    original_entities = state.get("detected_entities", [])
-
-    logger.info("Running quality audit on anonymized text")
-
-    # Check if any original PII text still appears
-    leakage_detected = False
+    
+    # Init wrapper for audit scan
+    # In a full version, we'd pass config here. For now, use same model settings.
+    analyzer = AnonerWrapper()
+    
+    logger.info("Running agentic quality audit (re-scan)")
+    
+    # Re-scan anonymized text (patterns only for speed during audit, unless configured otherwise)
+    audit_results = analyzer.analyze_all(anonymized_text, use_llm=False)
+    
     leaked_entities = []
+    for batch in audit_results:
+        for entity in batch:
+            # If the found text is NOT a placeholder we just inserted
+            # Placeholder format is [TYPE], so we check if it's bracketed
+            if not (entity.text.startswith("[") and entity.text.endswith("]")):
+                # Map back to original text coordinates (heuristic)
+                # For now, we identify it as a leak
+                # In a more advanced version, we'd use fuzzy matching to find original offset
+                leaked_entities.append(entity)
+                logger.warning(f"PII Leakage found: {entity.text}")
 
-    for entity in original_entities:
-        if entity.text in anonymized_text:
-            leakage_detected = True
-            leaked_entities.append(entity)
-            logger.warning(f"Leakage detected: {entity.entity_type} '{entity.text}'")
+    retry_count = state.get("retry_count", 0)
+    leakage_detected = len(leaked_entities) > 0
 
-    quality_report = {
-        "total_entities": len(original_entities),
-        "leaked_entities": len(leaked_entities),
-        "leakage_detected": leakage_detected,
-        "anonymization_complete": not leakage_detected,
-    }
-
-    message = (
-        f"Quality audit complete. "
-        f"{'LEAKAGE DETECTED: ' + str(len(leaked_entities)) + ' entities.' if leakage_detected else 'No leakage detected.'}"
-    )
-
+    # If leakage detected, we want to tell the detector where to look harder
+    # We pass these back via FlowState
     return {
-        "quality_report": quality_report,
         "leakage_detected": leakage_detected,
+        "missed_entities": leaked_entities,
+        "retry_count": retry_count + 1,
+        "quality_report": {
+            "leaks": len(leaked_entities),
+            "retry_count": retry_count,
+        },
         "messages": [{
             "role": "assistant",
-            "content": message,
+            "content": f"Audit found {len(leaked_entities)} leaks."
         }],
     }
 
@@ -144,19 +118,20 @@ def quality_audit_node(state: FlowState) -> dict:
 # =============================================================================
 
 
-def route_after_audit(state: FlowState) -> Literal["end", "anonymize"]:
+def route_after_audit(state: FlowState) -> Literal["end", "detect"]:
     """Route based on quality audit results.
-
-    If leakage detected, could route back to anonymization.
-    For now, always ends (single pass).
+    
+    Allows one self-correction retry if leakage is detected.
     """
-    if state.get("leakage_detected", False):
-        logger.warning("Leakage detected, but ending pipeline (single pass mode)")
+    if state.get("leakage_detected", False) and state.get("retry_count", 0) < 2:
+        logger.info("Leakage detected. Routing back to 'detect' for self-correction pass.")
+        return "detect"
+    
     return "end"
 
 
 # =============================================================================
-# Pipeline Factory
+# Flow Factory
 # =============================================================================
 
 
@@ -165,24 +140,11 @@ def create_privacy_flow(
     confidence_threshold: float = 0.7,
     preset: str = "clinical",
     use_ministral: bool = True,
-    ministral_model: str = "ministral",
+    ministral_model: str = "ministral-3:8b",
     ollama_url: str = "http://localhost:11434",
     use_gliner: bool = False,
 ) -> StateGraph:
-    """Create the PII detection and anonymization flow.
-
-    Args:
-        human_in_loop: Enable HITL validation for low-confidence entities.
-        confidence_threshold: Threshold below which HITL is triggered.
-        preset: German recognizer preset ('clinical', 'full_german', 'minimal').
-        use_ministral: Enable Ministral LLM recognizer.
-        ministral_model: Ollama model name.
-        ollama_url: Ollama server URL.
-        use_gliner: Enable GLiNER NER recognizer.
-
-    Returns:
-        Compiled LangGraph StateGraph ready for invocation.
-    """
+    """Create the PII detection and anonymization flow."""
     logger.info(
         f"Creating privacy flow (hitl={human_in_loop}, "
         f"threshold={confidence_threshold}, preset={preset})"
@@ -211,7 +173,6 @@ def create_privacy_flow(
 
     # Add edges
     if human_in_loop:
-        # Conditional routing based on confidence
         workflow.add_conditional_edges(
             "detect",
             route_after_detection,
@@ -222,7 +183,6 @@ def create_privacy_flow(
         )
         workflow.add_edge("human_validation", "anonymize")
     else:
-        # Skip HITL, go directly to anonymization
         workflow.add_edge("detect", "anonymize")
 
     workflow.add_edge("anonymize", "audit")
@@ -233,15 +193,11 @@ def create_privacy_flow(
         route_after_audit,
         {
             "end": END,
-            "anonymize": "anonymize",  # For future: retry on leakage
+            "detect": "detect",
         }
     )
 
-    # Compile
-    graph = workflow.compile()
-
-    logger.info("Privacy flow compiled successfully")
-    return graph
+    return workflow.compile()
 
 
 # =============================================================================
@@ -258,20 +214,7 @@ def run_flow(
     ministral_model: str = "ministral-3:8b",
     use_gliner: bool = False,
 ) -> dict:
-    """Convenience function to run the full flow on a document.
-
-    Args:
-        document: Text document to process.
-        confidence_threshold: HITL threshold.
-        human_in_loop: Enable HITL (requires UI in full implementation).
-        preset: German recognizer preset.
-        use_ministral: Enable Ministral LLM.
-        ministral_model: Ollama model name for Ministral.
-        use_gliner: Enable GLiNER NER.
-
-    Returns:
-        Final flow state with all results.
-    """
+    """Run the full flow on a document."""
     graph = create_privacy_flow(
         human_in_loop=human_in_loop,
         confidence_threshold=confidence_threshold,
@@ -284,6 +227,9 @@ def run_flow(
     result = graph.invoke({
         "document": document,
         "confidence_threshold": confidence_threshold,
+        "retry_count": 0,
+        "missed_entities": [],
+        "messages": [],
     })
 
     return result

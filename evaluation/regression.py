@@ -100,7 +100,7 @@ class RegressionTestSuite:
         ))
 
         # Run regression check
-        report = suite.run_regression_check(pipeline_fn)
+        report = suite.run_regression_check(flow_fn)
         if not report.passed:
             print("REGRESSION DETECTED!")
     """
@@ -198,12 +198,12 @@ class RegressionTestSuite:
 
     def update_baseline(
         self,
-        pipeline_fn: Callable[[str], List[Dict]],
+        flow_fn: Callable[[str], List[Dict]],
     ) -> Dict[str, float]:
-        """Update baseline scores from current pipeline performance.
+        """Update baseline scores from current flow performance.
 
         Args:
-            pipeline_fn: Function that takes text and returns detected entities
+            flow_fn: Function that takes text and returns detected entities
 
         Returns:
             New baseline scores
@@ -217,7 +217,7 @@ class RegressionTestSuite:
         detected = []
 
         for tc in test_cases:
-            results = pipeline_fn(tc.text)
+            results = flow_fn(tc.text)
             detected.append([results])
 
         # Calculate metrics
@@ -242,12 +242,12 @@ class RegressionTestSuite:
 
     def run_regression_check(
         self,
-        pipeline_fn: Callable[[str], List[Dict]],
+        flow_fn: Callable[[str], List[Dict]],
     ) -> RegressionReport:
         """Run regression check against baseline.
 
         Args:
-            pipeline_fn: Function that takes text and returns detected entities
+            flow_fn: Function that takes text and returns detected entities
 
         Returns:
             RegressionReport with pass/fail and details
@@ -267,7 +267,7 @@ class RegressionTestSuite:
         # Run evaluation
         detected = []
         for tc in test_cases:
-            results = pipeline_fn(tc.text)
+            results = flow_fn(tc.text)
             detected.append(results)
 
         metrics = MultiDimensionalMetrics.calculate(

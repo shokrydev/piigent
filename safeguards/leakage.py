@@ -216,14 +216,14 @@ class LeakageChecker:
 
     def check_memorization(
         self,
-        pipeline,
+        flow_runner,
         synthetic_samples: List[Dict],
         novel_samples: List[Dict],
     ) -> Dict:
-        """Check if pipeline memorized synthetic data vs generalizing.
+        """Check if the flow memorized synthetic data vs generalizing.
 
         Args:
-            pipeline: Detection pipeline
+            flow_runner: Function that runs the flow and returns final state dict
             synthetic_samples: Samples similar to training
             novel_samples: Novel samples different from training
 
@@ -241,17 +241,18 @@ class LeakageChecker:
             expected = sample.get("entities", [])
 
             try:
-                detected = pipeline(text)
-                if not isinstance(detected, list):
-                    detected = []
+                # Flow runner returns a state dict (from graph.invoke or run_flow)
+                result = flow_runner(text)
+                detected = result.get("detected_entities", [])
 
                 # Count exact matches
                 expected_spans = {(e["start"], e["end"]) for e in expected}
-                detected_spans = {(d.get("start", 0), d.get("end", 0)) for d in detected}
+                detected_spans = {(d.start, d.end) for d in detected}
 
                 synth_correct += len(expected_spans & detected_spans)
                 synth_total += len(expected_spans)
-            except Exception:
+            except Exception as e:
+                logger.error(f"Memorization check failed for synthetic sample: {e}")
                 synth_total += len(expected)
 
         for sample in novel_samples:
@@ -259,16 +260,16 @@ class LeakageChecker:
             expected = sample.get("entities", [])
 
             try:
-                detected = pipeline(text)
-                if not isinstance(detected, list):
-                    detected = []
+                result = flow_runner(text)
+                detected = result.get("detected_entities", [])
 
                 expected_spans = {(e["start"], e["end"]) for e in expected}
-                detected_spans = {(d.get("start", 0), d.get("end", 0)) for d in detected}
+                detected_spans = {(d.start, d.end) for d in detected}
 
                 novel_correct += len(expected_spans & detected_spans)
                 novel_total += len(expected_spans)
-            except Exception:
+            except Exception as e:
+                logger.error(f"Memorization check failed for novel sample: {e}")
                 novel_total += len(expected)
 
         synth_accuracy = synth_correct / synth_total if synth_total > 0 else 0

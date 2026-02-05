@@ -3,28 +3,21 @@
 ## Installation
 
 ```bash
+# Clone the repository
 git clone https://github.com/shokrydev/piigent.git
 cd piigent
 
-python -m venv .venv
-source .venv/bin/activate
+# Sync the workspace (creates .venv and installs all dependencies)
+uv sync
 
-# Install custom Presidio fork (required)
-pip install -e ./anoner/presidio-analyzer
-
-# Install pipeline dependencies
-pip install langgraph langchain-core httpx
-
-# Optional: Pull model for LLM recognition
+# Pull the required LLM for agentic detection
 ollama pull ministral-3:8b
 ```
 
-## Running the Pipeline
-
-You can run the standard PII detection pipeline on a single document:
+You can run the standard PII detection flow:
 
 ```bash
-python .demo/run_agentic_flow.py
+uv run demo/run_agentic_flow.py
 ```
 
 Code example:
@@ -46,17 +39,15 @@ result = run_flow(
 print(result['anonymized_text'])
 ```
 
-## Running Weakness Analysis
-
-To explore where the pipeline fails and generate targeted test cases:
+To explore where the flow fails and generate targeted test cases:
 
 ```bash
-python .demo/run_weakness_analysis.py
+uv run demo/run_weakness_analysis.py
 ```
 
 Code example:
 ```python
-from agents.weakness_analyzer import analyze_weaknesses
+from agents.core.weakness_analyzer import analyze_weaknesses
 
 report = analyze_weaknesses(
     num_docs=20,
