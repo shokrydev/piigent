@@ -32,6 +32,7 @@ from presidio_analyzer.predefined_recognizers import (
 
 from graph.state import PipelineState, DetectedEntity
 from agents.aggregator import EntityAggregator
+from nodes.reflective_resolution import ReflectiveResolver
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +116,7 @@ def _run_ministral(text: str, model: str, ollama_url: str) -> List[DetectedEntit
         results = recognizer.analyze(
             text=text,
             entities=["PERSON", "LOCATION", "ORGANIZATION", "PHONE_NUMBER",
-                      "EMAIL_ADDRESS", "DATE_TIME", "IBAN", "ID"],
+                      "EMAIL_ADDRESS", "DATE_TIME", "AGE", "IBAN", "ID"],
         )
         return [
             DetectedEntity(
@@ -184,7 +185,16 @@ class DetectionCoordinator:
         self.ministral_model = ministral_model
         self.ollama_url = ollama_url
         self.use_gliner = use_gliner
-        self.aggregator = EntityAggregator()
+        
+        # Initialize Agentic Resolver
+        resolver = None
+        if use_ministral:
+             resolver = ReflectiveResolver(
+                 ollama_url=ollama_url,
+                 model=ministral_model
+             )
+        
+        self.aggregator = EntityAggregator(resolver=resolver)
 
         logger.info(f"DetectionCoordinator(preset={preset}, ministral={use_ministral}, gliner={use_gliner})")
 
@@ -239,7 +249,7 @@ class DetectionCoordinator:
             recognizers_used.append("german")
 
         # Aggregate
-        entities = self.aggregator.aggregate(results)
+        entities = self.aggregator.aggregate(results, text=document)
         min_conf = min((e.score for e in entities), default=1.0)
         needs_validation = min_conf < threshold
 

@@ -315,7 +315,7 @@ class DisagreementEvaluator:
 
         elif strategy == "most_specific":
             # Use type specificity
-            from pipeline.overlap_resolver import TYPE_SPECIFICITY
+            from nodes.overlap_resolver import TYPE_SPECIFICITY
             return max(
                 [p for _, p in valid_predictions],
                 key=lambda p: TYPE_SPECIFICITY.get(

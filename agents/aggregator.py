@@ -3,9 +3,10 @@
 import logging
 from collections import defaultdict
 from copy import deepcopy
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 from graph.state import DetectedEntity
+from nodes.reflective_resolution import ReflectiveResolver
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,9 @@ AggregationStrategy = Literal["max", "boost"]
 
 class EntityAggregator:
     """Merge and deduplicate results from multiple recognizers."""
+
+    def __init__(self, resolver: Optional[ReflectiveResolver] = None):
+        self.resolver = resolver
 
     @staticmethod
     def _entities_overlap(e1: DetectedEntity, e2: DetectedEntity) -> bool:
@@ -60,11 +64,11 @@ class EntityAggregator:
 
         return merged
 
-    @classmethod
     def aggregate(
-        cls,
+        self,
         entity_lists: List[List[DetectedEntity]],
         strategy: AggregationStrategy = "boost",
+        text: Optional[str] = None,
     ) -> List[DetectedEntity]:
         """Aggregate entities from multiple recognizers.
 
@@ -105,7 +109,13 @@ class EntityAggregator:
                     exact_merged.append(best)
 
         # Now handle overlapping entities
-        result = cls._merge_overlapping(exact_merged, strategy)
+        if self.resolver and text:
+             # Use agentic resolution
+             # ReflectiveResolver expects list of entities and text
+             return self.resolver.resolve(exact_merged, text)
+        else:
+             # Fallback to heuristic merge
+             result = self._merge_overlapping(exact_merged, strategy)
 
         # Sort by position
         result.sort(key=lambda x: x.start)

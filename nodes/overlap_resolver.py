@@ -20,6 +20,7 @@ class ResolutionStrategy(str, Enum):
     PREFER_CONFIDENCE = "prefer_confidence"  # Keep higher confidence
     MERGE = "merge"                          # Combine into one entity
     KEEP_ALL = "keep_all"                    # Keep all overlapping entities
+    HYBRID = "hybrid"                        # Fast path + Agentic path
 
 
 # Type specificity scores (higher = more specific, should be preferred)
@@ -110,6 +111,13 @@ class OverlapResolver:
 
         self.conflicts: List[OverlapConflict] = []
 
+    def _get_val(self, item, key, default=None):
+        """Get value from dict or object."""
+        if isinstance(item, dict):
+            return item.get(key, default)
+        return getattr(item, key, default)
+
+
     def resolve(self, entities: List[Dict]) -> List[Dict]:
         """Resolve overlapping entities.
 
@@ -123,7 +131,7 @@ class OverlapResolver:
             return entities
 
         # Sort by start position, then by end position (longer first)
-        sorted_entities = sorted(entities, key=lambda e: (e["start"], -e["end"]))
+        sorted_entities = sorted(entities, key=lambda e: (self._get_val(e, "start"), -self._get_val(e, "end")))
 
         # Track which entities to keep
         keep = [True] * len(sorted_entities)
@@ -158,8 +166,8 @@ class OverlapResolver:
 
     def _calculate_overlap(self, entity_a: Dict, entity_b: Dict) -> float:
         """Calculate overlap ratio between two entities."""
-        start_a, end_a = entity_a["start"], entity_a["end"]
-        start_b, end_b = entity_b["start"], entity_b["end"]
+        start_a, end_a = self._get_val(entity_a, "start"), self._get_val(entity_a, "end")
+        start_b, end_b = self._get_val(entity_b, "start"), self._get_val(entity_b, "end")
 
         # Calculate overlap
         overlap_start = max(start_a, start_b)
@@ -184,12 +192,12 @@ class OverlapResolver:
         Returns:
             "keep_a", "keep_b", or "keep_both"
         """
-        type_a = entity_a.get("entity_type", entity_a.get("type", ""))
-        type_b = entity_b.get("entity_type", entity_b.get("type", ""))
-        score_a = entity_a.get("score", 0.5)
-        score_b = entity_b.get("score", 0.5)
-        len_a = entity_a["end"] - entity_a["start"]
-        len_b = entity_b["end"] - entity_b["start"]
+        type_a = self._get_val(entity_a, "entity_type", self._get_val(entity_a, "type", ""))
+        type_b = self._get_val(entity_b, "entity_type", self._get_val(entity_b, "type", ""))
+        score_a = self._get_val(entity_a, "score", 0.5)
+        score_b = self._get_val(entity_b, "score", 0.5)
+        len_a = self._get_val(entity_a, "end") - self._get_val(entity_a, "start")
+        len_b = self._get_val(entity_b, "end") - self._get_val(entity_b, "start")
 
         resolution = "keep_both"
         reason = ""
@@ -280,7 +288,7 @@ class OverlapResolver:
 
     def _contains(self, outer: Dict, inner: Dict) -> bool:
         """Check if outer entity fully contains inner entity."""
-        return outer["start"] <= inner["start"] and outer["end"] >= inner["end"]
+        return self._get_val(outer, "start") <= self._get_val(inner, "start") and self._get_val(outer, "end") >= self._get_val(inner, "end")
 
     def get_conflicts(self) -> List[OverlapConflict]:
         """Get all recorded conflicts."""

@@ -210,10 +210,10 @@ def test_pipeline_module():
     """Test Multi-Step NER Pipeline."""
     print("\n=== Testing pipeline module ===")
 
-    from pipeline.section_parser import SectionParser, ClinicalSection
-    from pipeline.domain_rules import DomainRulesEngine, Rule, RuleAction
-    from pipeline.overlap_resolver import OverlapResolver, ResolutionStrategy
-    from pipeline.consistency import ConsistencyValidator
+    from nodes.section_parser import SectionParser, ClinicalSection
+    from nodes.domain_rules import DomainRulesEngine, Rule, RuleAction
+    from nodes.overlap_resolver import OverlapResolver, ResolutionStrategy
+    from nodes.consistency import ConsistencyValidator
 
     # Test section parser
     parser = SectionParser()
