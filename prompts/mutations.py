@@ -309,7 +309,7 @@ def create_mutation_from_fix(
     Returns:
         Tuple of (operator, params)
     """
-    from agents.fix_proposal import MutationOperator as FixMutation
+    from agents.critics.fix_proposal import MutationOperator as FixMutation
 
     # Map fix mutations to genome mutations
     mutation_map = {

@@ -187,7 +187,7 @@ class WeaknessAnalyzerState(TypedDict):
 def run_initial_benchmark(state: WeaknessAnalyzerState) -> Dict:
     """Run initial benchmark to establish baseline metrics."""
     from benchmarks.run_benchmark import run_benchmark
-    from agents.synpii_integration import get_synpii_generator
+    from agents.helpers.synpii_integration import get_synpii_generator
 
     num_docs = state["num_initial_docs"]
     logger.info(f"Running initial benchmark with {num_docs} documents")
@@ -343,8 +343,8 @@ def generate_hypothesis(state: WeaknessAnalyzerState) -> Dict:
 
 def run_targeted_tests(state: WeaknessAnalyzerState) -> Dict:
     """Generate and run targeted test cases."""
-    from graph.pipeline_graph import run_pipeline
-    from agents.synpii_integration import get_synpii_generator
+    from graph.privacy_flow import run_flow
+    from agents.helpers.synpii_integration import get_synpii_generator
 
     weaknesses = state["identified_weaknesses"]
     idx = state.get("current_weakness_index", 0)
@@ -370,7 +370,7 @@ def run_targeted_tests(state: WeaknessAnalyzerState) -> Dict:
     test_results = []
     for tc in test_cases:
         try:
-            result = run_pipeline(
+            result = run_flow(
                 document=tc.text,
                 confidence_threshold=state.get("confidence_threshold", 0.7),
                 human_in_loop=False,
@@ -598,9 +598,9 @@ def run_prompt_evolution(state: WeaknessAnalyzerState) -> Dict:
     verifies improvements with VerificationAgent, and stores
     successful genomes.
     """
-    from agents.weakness_to_mutation import WeaknessToMutationMapper
-    from agents.fix_proposal import FixProposalAgent
-    from agents.verification import VerificationAgent, TestCase as VerificationTestCase
+    from agents.core.weakness_to_mutation import WeaknessToMutationMapper
+    from agents.critics.fix_proposal import FixProposalAgent
+    from agents.critics.verification import VerificationAgent, TestCase as VerificationTestCase
     from prompts.store import PromptGenomeStore
     from prompts.mutations import MutationEngine, create_mutation_from_fix
     

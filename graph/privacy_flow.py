@@ -13,8 +13,8 @@ from typing import Literal, Optional
 
 from langgraph.graph import StateGraph, END
 
-from graph.state import PipelineState
-from agents.detection_coordinator import (
+from graph.state import FlowState
+from agents.core.detection_coordinator import (
     DetectionCoordinator,
     create_detection_coordinator,
     route_after_detection,
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
-def human_validation_node(state: PipelineState) -> dict:
+def human_validation_node(state: FlowState) -> dict:
     """Human-in-the-loop validation node.
 
     In the full implementation, this would:
@@ -53,7 +53,7 @@ def human_validation_node(state: PipelineState) -> dict:
     }
 
 
-def anonymization_node(state: PipelineState) -> dict:
+def anonymization_node(state: FlowState) -> dict:
     """Anonymization Strategist node.
 
     In the full implementation, this would:
@@ -91,7 +91,7 @@ def anonymization_node(state: PipelineState) -> dict:
     }
 
 
-def quality_audit_node(state: PipelineState) -> dict:
+def quality_audit_node(state: FlowState) -> dict:
     """Quality Auditor node.
 
     In the full implementation, this would:
@@ -144,7 +144,7 @@ def quality_audit_node(state: PipelineState) -> dict:
 # =============================================================================
 
 
-def route_after_audit(state: PipelineState) -> Literal["end", "anonymize"]:
+def route_after_audit(state: FlowState) -> Literal["end", "anonymize"]:
     """Route based on quality audit results.
 
     If leakage detected, could route back to anonymization.
@@ -160,7 +160,7 @@ def route_after_audit(state: PipelineState) -> Literal["end", "anonymize"]:
 # =============================================================================
 
 
-def create_privacy_pipeline(
+def create_privacy_flow(
     human_in_loop: bool = True,
     confidence_threshold: float = 0.7,
     preset: str = "clinical",
@@ -169,7 +169,7 @@ def create_privacy_pipeline(
     ollama_url: str = "http://localhost:11434",
     use_gliner: bool = False,
 ) -> StateGraph:
-    """Create the PII detection and anonymization pipeline.
+    """Create the PII detection and anonymization flow.
 
     Args:
         human_in_loop: Enable HITL validation for low-confidence entities.
@@ -184,7 +184,7 @@ def create_privacy_pipeline(
         Compiled LangGraph StateGraph ready for invocation.
     """
     logger.info(
-        f"Creating privacy pipeline (hitl={human_in_loop}, "
+        f"Creating privacy flow (hitl={human_in_loop}, "
         f"threshold={confidence_threshold}, preset={preset})"
     )
 
@@ -198,7 +198,7 @@ def create_privacy_pipeline(
     )
 
     # Build the graph
-    workflow = StateGraph(PipelineState)
+    workflow = StateGraph(FlowState)
 
     # Add nodes
     workflow.add_node("detect", detection_coordinator)
@@ -240,7 +240,7 @@ def create_privacy_pipeline(
     # Compile
     graph = workflow.compile()
 
-    logger.info("Privacy pipeline compiled successfully")
+    logger.info("Privacy flow compiled successfully")
     return graph
 
 
@@ -249,7 +249,7 @@ def create_privacy_pipeline(
 # =============================================================================
 
 
-def run_pipeline(
+def run_flow(
     document: str,
     confidence_threshold: float = 0.7,
     human_in_loop: bool = False,
@@ -258,7 +258,7 @@ def run_pipeline(
     ministral_model: str = "ministral-3:8b",
     use_gliner: bool = False,
 ) -> dict:
-    """Convenience function to run the full pipeline on a document.
+    """Convenience function to run the full flow on a document.
 
     Args:
         document: Text document to process.
@@ -270,9 +270,9 @@ def run_pipeline(
         use_gliner: Enable GLiNER NER.
 
     Returns:
-        Final pipeline state with all results.
+        Final flow state with all results.
     """
-    graph = create_privacy_pipeline(
+    graph = create_privacy_flow(
         human_in_loop=human_in_loop,
         confidence_threshold=confidence_threshold,
         preset=preset,

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Demo script for running the PIIgent privacy pipeline.
+Demo script for running the PIIgent agentic flow.
 """
 import sys
 import os
@@ -8,10 +8,10 @@ import os
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from graph.pipeline_graph import run_pipeline
+from graph.privacy_flow import run_flow
 
 def main():
-    print("Running PIIgent Privacy Pipeline...")
+    print("Running PIIgent Agentic Flow...")
     
     document = """
     Entlassungsbrief - Charité Berlin
@@ -23,7 +23,7 @@ def main():
     print(f"Input Document:\n{document}\n")
     
     try:
-        result = run_pipeline(
+        result = run_flow(
             document=document,
             confidence_threshold=0.7,
             human_in_loop=False,

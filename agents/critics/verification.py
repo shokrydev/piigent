@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Callable, Dict, List, Optional, Tuple
 
-from agents.fix_proposal import ProposedFix
+from agents.critics.fix_proposal import ProposedFix
 from evaluation.metrics import MultiDimensionalMetrics
 from evaluation.regression import RegressionTestSuite
 from prompts.genome import PromptGenotype

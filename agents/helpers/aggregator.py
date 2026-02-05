@@ -6,7 +6,7 @@ from copy import deepcopy
 from typing import List, Literal, Optional
 
 from graph.state import DetectedEntity
-from nodes.reflective_resolution import ReflectiveResolver
+from components.reflective_resolution import ReflectiveResolver
 
 logger = logging.getLogger(__name__)
 

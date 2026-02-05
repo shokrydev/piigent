@@ -12,27 +12,27 @@ Includes:
 def __getattr__(name):
     """Lazy import for agents with external dependencies."""
     if name == "DetectionCoordinator":
-        from .detection_coordinator import DetectionCoordinator
+        from .core.detection_coordinator import DetectionCoordinator
         return DetectionCoordinator
     if name == "create_detection_coordinator":
-        from .detection_coordinator import create_detection_coordinator
+        from .core.detection_coordinator import create_detection_coordinator
         return create_detection_coordinator
     if name == "route_after_detection":
-        from .detection_coordinator import route_after_detection
+        from .core.detection_coordinator import route_after_detection
         return route_after_detection
 
     # Self-critique agents
     if name == "RationaleAgent":
-        from .rationale import RationaleAgent
+        from .critics.rationale import RationaleAgent
         return RationaleAgent
     if name == "ErrorTaxonomyAgent":
-        from .error_taxonomy import ErrorTaxonomyAgent
+        from .critics.error_taxonomy import ErrorTaxonomyAgent
         return ErrorTaxonomyAgent
     if name == "FixProposalAgent":
-        from .fix_proposal import FixProposalAgent
+        from .critics.fix_proposal import FixProposalAgent
         return FixProposalAgent
     if name == "VerificationAgent":
-        from .verification import VerificationAgent
+        from .critics.verification import VerificationAgent
         return VerificationAgent
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -8,7 +8,7 @@ import os
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from agents.weakness_analyzer import analyze_weaknesses
+from agents.core.weakness_analyzer import analyze_weaknesses
 
 def main():
     print("Running PIIgent Weakness Analyzer...")

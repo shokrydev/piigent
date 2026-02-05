@@ -30,9 +30,9 @@ from presidio_analyzer.predefined_recognizers import (
     DeLicensePlateRecognizer,
 )
 
-from graph.state import PipelineState, DetectedEntity
-from agents.aggregator import EntityAggregator
-from nodes.reflective_resolution import ReflectiveResolver
+from graph.state import FlowState, DetectedEntity
+from agents.helpers.aggregator import EntityAggregator
+from components.reflective_resolution import ReflectiveResolver
 
 logger = logging.getLogger(__name__)
 
@@ -198,8 +198,8 @@ class DetectionCoordinator:
 
         logger.info(f"DetectionCoordinator(preset={preset}, ministral={use_ministral}, gliner={use_gliner})")
 
-    def __call__(self, state: PipelineState) -> dict:
-        """LangGraph node - execute detection pipeline."""
+    def __call__(self, state: FlowState) -> dict:
+        """LangGraph node - execute detection flow."""
         document = state["document"]
         threshold = state.get("confidence_threshold", 0.7)
 
@@ -292,7 +292,7 @@ def create_detection_coordinator(
     )
 
 
-def route_after_detection(state: PipelineState) -> Literal["human_validation", "anonymize"]:
+def route_after_detection(state: FlowState) -> Literal["human_validation", "anonymize"]:
     """Routing function for LangGraph conditional edge."""
     if state.get("needs_human_validation", False):
         return "human_validation"

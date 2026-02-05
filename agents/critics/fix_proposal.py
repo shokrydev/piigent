@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
-from agents.error_taxonomy import ClassifiedError, ErrorType, ErrorTaxonomyAgent
+from agents.critics.error_taxonomy import ClassifiedError, ErrorType, ErrorTaxonomyAgent
 from prompts.genome import PromptGenotype
 
 

@@ -10,7 +10,7 @@ It replaces the purely heuristic OverlapResolver.
 import logging
 from typing import List, Dict, Optional, Tuple, Any
 
-from nodes.overlap_resolver import OverlapResolver, ResolutionStrategy
+from components.overlap_resolver import OverlapResolver, ResolutionStrategy
 from wrappers.llm_wrapper import PromptManagedLLM
 
 logger = logging.getLogger(__name__)

@@ -1,15 +1,18 @@
-# LangGraph pipeline
+# LangGraph & Core
 langgraph>=0.2.0
 langchain-core>=0.3.0
-
-# Custom Presidio fork (install from local)
-# pip install -e ./presidio-analyzer/presidio-analyzer
-
-# Presidio dependencies
-spacy>=3.7.0
-
-# For MinistralOllamaRecognizer
 httpx>=0.25.0
+
+# Presidio & NLP
+spacy>=3.7.0
+# Local Presidio fork (uncomment if installing manually, or run pip install -e ./anoner/presidio-analyzer)
+# ./anoner/presidio-analyzer
+
+# UI
+gradio>=4.0.0
+
+# Testing
+pytest>=7.0.0
 
 # Optional: for NER recognizers
 # transformers>=4.30.0

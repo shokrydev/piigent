@@ -20,8 +20,8 @@ class DetectedEntity:
         return f"DetectedEntity({self.entity_type}: '{self.text}' [{self.start}:{self.end}] score={self.score:.2f})"
 
 
-class PipelineState(TypedDict):
-    """Shared state across all pipeline agents."""
+class FlowState(TypedDict):
+    """Shared state across all flow agents."""
 
     # Input
     document: str

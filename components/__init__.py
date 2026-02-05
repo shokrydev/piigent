@@ -8,10 +8,10 @@ This module provides a sophisticated multi-step NER pipeline that:
 5. Validates consistency
 """
 
-from nodes.section_parser import SectionParser, ClinicalSection
-from nodes.domain_rules import DomainRulesEngine, Rule, RuleAction
-from nodes.overlap_resolver import OverlapResolver, ResolutionStrategy
-from nodes.consistency import ConsistencyValidator
+from components.section_parser import SectionParser, ClinicalSection
+from components.domain_rules import DomainRulesEngine, Rule, RuleAction
+from components.overlap_resolver import OverlapResolver, ResolutionStrategy
+from components.consistency import ConsistencyValidator
 
 __all__ = [
     "SectionParser",

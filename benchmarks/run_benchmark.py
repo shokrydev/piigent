@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from synpii import SynPII
 from benchmarks.metrics import calculate_dataset_metrics
-from graph.pipeline_graph import run_pipeline
+from graph.privacy_flow import run_flow
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
@@ -58,7 +58,7 @@ def run_benchmark(
     for i, doc in enumerate(documents):
         start_time = time.time()
 
-        result = run_pipeline(
+        result = run_flow(
             document=doc["text"],
             confidence_threshold=confidence_threshold,
             human_in_loop=False,  # Autonomous mode for benchmarking

@@ -7,9 +7,9 @@ enabling automatic prompt evolution based on discovered weaknesses.
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
-from agents.error_taxonomy import ClassifiedError, ErrorType
-from agents.fix_proposal import MutationOperator, ProposedFix
-from agents.weakness_analyzer import WeaknessType
+from agents.critics.error_taxonomy import ClassifiedError, ErrorType
+from agents.critics.fix_proposal import MutationOperator, ProposedFix
+from agents.core.weakness_analyzer import WeaknessType
 
 
 # =============================================================================
