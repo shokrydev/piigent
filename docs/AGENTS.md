@@ -25,7 +25,9 @@
      * **Role**: Centalized interface for the `anoner` (Presidio) fork.
      * **Capabilities**: Patterns, LLM (Ministral), and BERT/GLiNER models.
  * **`agents/helpers/aggregator.py`**: Pure logic to merge overlapping PII detections.
- * **`agents/helpers/synpii_integration.py`**: Wrapper around the synthetic data generator.
+  * **`agents/helpers/synpii_integration.py`**:
+      * **Role**: Bridging agent requirements to SynPII strategies.
+      * **Mechanism**: Maps `Weakness` objects to `AdversarialStrategy` instances for targeted document generation.
  * **`agents/core/weakness_to_mutation.py`**: Maps weaknesses to specific prompt mutations.
  * **`agents/critics/error_taxonomy.py`**: Classifies errors for the critics.
 

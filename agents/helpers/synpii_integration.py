@@ -34,23 +34,20 @@ class SynPIITestGenerator:
             seed: Random seed for reproducibility.
         """
         from synpii import SynPII
-        from synpii.weakness import WeaknessTargetedGenerator, WeaknessType, WeaknessReport
-        from synpii.core.lexicon import GermanLexicon
-        from synpii.generators import GeneratorRegistry
+        from synpii.adversarial import AdversarialType, AdversarialScenario
 
-        # Initialize SynPII components
-        values_dir = Path(__file__).parent.parent / "synpii" / "values"
-        self.lexicon = GermanLexicon(values_dir)
-        self.registry = GeneratorRegistry(lexicon=self.lexicon)
+        # Use the SynPII facade for unified component management
+        # It handles paths, seeds, and lazy-loading of sub-components
         self.synpii = SynPII(preset="clinical_de", seed=seed)
-        self.targeted_gen = WeaknessTargetedGenerator(
-            generators=self.registry,
-            lexicon=self.lexicon,
-        )
+        
+        # Access shared components from the facade
+        self.lexicon = self.synpii.lexicon
+        self.registry = self.synpii.generators
+        self.adversarial_gen = self.synpii.adversarial_generator
 
-        # SynPII weakness types
-        self.WeaknessType = WeaknessType
-        self.WeaknessReport = WeaknessReport
+        # SynPII research types
+        self.AdversarialType = AdversarialType
+        self.AdversarialScenario = AdversarialScenario
 
     def generate_document(self) -> Dict:
         """Generate a synthetic clinical document with annotations.
@@ -85,14 +82,14 @@ class SynPIITestGenerator:
         """
         return [self.generate_document() for _ in range(count)]
 
-    def _map_weakness_type(self, weakness_type_str: str) -> Optional["WeaknessType"]:
-        """Map string weakness type to SynPII WeaknessType enum."""
+    def _map_adversarial_type(self, weakness_type_str: str) -> Optional["AdversarialType"]:
+        """Map PIIgent weakness type to SynPII AdversarialType enum."""
         mapping = {
-            "overlap_conflict": self.WeaknessType.OVERLAP_CONFLICT,
-            "format_variation": self.WeaknessType.FORMAT_VARIATION,
-            "context_dependency": self.WeaknessType.CONTEXT_DEPENDENCY,
-            "coverage_gap": self.WeaknessType.COVERAGE_GAP,
-            "entity_confusion": self.WeaknessType.ENTITY_CONFUSION,
+            "overlap_conflict": self.AdversarialType.OVERLAP_CONFLICT,
+            "format_variation": self.AdversarialType.FORMAT_VARIATION,
+            "context_dependency": self.AdversarialType.CONTEXT_DEPENDENCY,
+            "coverage_gap": self.AdversarialType.COVERAGE_GAP,
+            "entity_confusion": self.AdversarialType.ENTITY_CONFUSION,
         }
         return mapping.get(weakness_type_str)
 
@@ -108,40 +105,40 @@ class SynPIITestGenerator:
         """
         weakness_type_str = weakness.get("weakness_type", "")
         entity_type = weakness.get("entity_type", "")
-        synpii_weakness_type = self._map_weakness_type(weakness_type_str)
+        adv_type = self._map_adversarial_type(weakness_type_str)
 
-        if synpii_weakness_type is None:
+        if adv_type is None:
             logger.warning(f"Unknown weakness type: {weakness_type_str}")
             return self._fallback_generation(entity_type, count)
 
-        # Create SynPII WeaknessReport
-        report = self.WeaknessReport(
-            weakness_type=synpii_weakness_type,
+        # Create SynPII AdversarialScenario
+        scenario = self.AdversarialScenario(
+            adversarial_type=adv_type,
             entity_type=entity_type,
             description=weakness.get("description", ""),
             evidence=weakness.get("evidence", {}),
         )
 
-        # Generate using SynPII
-        synpii_cases = self.targeted_gen.generate_for_weakness(report, count=count)
+        # Generate using SynPII adversarial generator
+        synpii_samples = self.adversarial_gen.generate_for_scenario(scenario, count=count)
 
         # Convert to TestCase format
         test_cases = []
-        for case in synpii_cases:
+        for sample in synpii_samples:
             # Extract entity values from text
-            expected = {entity_type: [case.text]}
+            expected = {entity_type: [sample.text]}
 
             # Check for overlapping entity types
-            if synpii_weakness_type == self.WeaknessType.OVERLAP_CONFLICT:
+            if adv_type == self.AdversarialType.OVERLAP_CONFLICT:
                 evidence = weakness.get("evidence", {})
                 if isinstance(evidence, dict) and "conflicting_type" in evidence:
                     conflicting_type = evidence["conflicting_type"]
                     expected[conflicting_type] = []  # Expected to potentially interfere
 
             test_cases.append(TestCase(
-                text=case.text,
+                text=sample.text,
                 expected_entities=expected,
-                description=case.description if hasattr(case, 'description') else f"SynPII-generated {synpii_weakness_type.value}",
+                description=sample.metadata.get("pattern", f"Adversarial {adv_type.value}"),
             ))
 
         return test_cases

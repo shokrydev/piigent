@@ -69,6 +69,22 @@ class DifficultyDimensions:
 
 **Failure-weighted sampling** oversamples regions where the system fails.
 
+## Synthetic Data Infrastructure (SynPII)
+
+PIIgent uses a grammar-aware synthetic engine (`SynPII`) for adversarial testing and validation.
+
+### Adversarial Research
+SynPII provides an `AdversarialGenerator` that uses specific **Adversarial Scenarios** (generative recipes) to "stress-test" the detection flow. This allows the PIIgent agents to request targeted data for identified failure modes:
+- **OverlapScenario**: Places entities in close proximity to trigger resolution errors (e.g., PLZ inside a LOCATION).
+- **FormatScenario**: Randomizes separators and casing to test pattern robustness.
+- **ContextScenario**: Wraps entities in ambiguous phrases to test LLM contextual reasoning.
+
+### Leakage Protection
+To prevent the Prompt Evolution system from "cheating" by memorizing synthetic patterns, the `LeakageChecker` monitors prompts for:
+- **Template Artifacts**: Detecting internal placeholder formats (e.g., `{{PLACEHOLDER}}`).
+- **Synthetic Regularity**: Identifying overly consistent naming patterns (e.g., `Person_1`).
+- **Memorization Gap**: Comparing performance on synthetic vs. novel/human-audited samples.
+
 ## Evaluation Metrics
 
 Beyond aggregate F1, PIIgent tracks:
@@ -81,3 +97,4 @@ Beyond aggregate F1, PIIgent tracks:
 | **Calibration** | Expected Calibration Error (ECE), overconfidence rate |
 | **Per-Entity-Type** | Confusion matrix, entity-specific F2 |
 | **Multi-Recognizer** | Agreement rate, disagreement analysis |
+| **Generalization** | Gap between synthetic validation and novel test sets |
