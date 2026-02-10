@@ -631,7 +631,7 @@ def run_prompt_evolution(state: WeaknessAnalyzerState) -> Dict:
         
         # Load or create base genome
         genome = store.get_best() or store.ensure_default_exists()
-        original_genome_id = genome.genome_id
+        original_genome_id = genome.id
         
         logger.info(f"Starting evolution from genome: {original_genome_id}")
         
@@ -712,11 +712,8 @@ def run_prompt_evolution(state: WeaknessAnalyzerState) -> Dict:
         evolution_metrics = {}
         
         if applied_mutations:
-            # Update genome metadata
-            current_genome.generation += 1
-            current_genome.parent_id = original_genome_id
             store.save(current_genome)
-            evolved_genome_id = current_genome.genome_id
+            evolved_genome_id = current_genome.id
             
             evolution_metrics = {
                 "mutations_attempted": len(proposals_to_try),
