@@ -27,6 +27,10 @@ from langgraph.graph import StateGraph, END
 logger = logging.getLogger(__name__)
 
 
+
+DEFAULT_MODEL = "ministral-3:8b"
+
+
 # =============================================================================
 # Weakness Types
 # =============================================================================
@@ -201,7 +205,7 @@ def run_initial_benchmark(state: WeaknessAnalyzerState) -> Dict:
         documents=doc_dicts,
         preset=state.get("preset", "clinical"),
         use_ministral=state.get("use_ministral", True),
-        ministral_model=state.get("ministral_model", "ministral-3:8b"),
+        ministral_model=state.get("ministral_model", DEFAULT_MODEL),
         use_gliner=False,
         confidence_threshold=state.get("confidence_threshold", 0.7),
     )
@@ -376,7 +380,7 @@ def run_targeted_tests(state: WeaknessAnalyzerState) -> Dict:
                 human_in_loop=False,
                 preset=state.get("preset", "clinical"),
                 use_ministral=state.get("use_ministral", True),
-                ministral_model=state.get("ministral_model", "ministral-3:8b"),
+                ministral_model=state.get("ministral_model", DEFAULT_MODEL),
             )
 
             detected = result.get("detected_entities", [])
