@@ -8,14 +8,14 @@ import os
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from agents.core.weakness_analyzer import analyze_weaknesses
+from agents.core.adversarial_orchestrator import run_adversarial_simulation
 
 def main():
-    print("Running PIIgent Weakness Analyzer...")
-    print("Note: This performs an iterative analysis which may take some time.")
+    print("Running PIIgent Adversarial Simulation (Red-Blue Team)...")
+    print("Note: This performs an iterative Red Team attack and Blue Team defense.")
     
     try:
-        report = analyze_weaknesses(
+        report = run_adversarial_simulation(
             num_docs=5,  # Reduced for demo purposes
             max_rounds=2,
             enable_evolution=True, 

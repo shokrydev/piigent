@@ -10,7 +10,7 @@ This module provides a sophisticated multi-step NER flow that:
 
 from components.section_parser import SectionParser, ClinicalSection
 from components.domain_rules import DomainRulesEngine, Rule, RuleAction
-from components.overlap_resolver import OverlapResolver, ResolutionStrategy
+from components.reflective_resolution import OverlapResolver, ResolutionStrategy
 from components.consistency import ConsistencyValidator
 
 __all__ = [

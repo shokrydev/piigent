@@ -1,7 +1,7 @@
 import pytest
 from components.section_parser import SectionParser
 from components.domain_rules import DomainRulesEngine
-from components.overlap_resolver import OverlapResolver, ResolutionStrategy
+from components.reflective_resolution import OverlapResolver, ResolutionStrategy
 from components.consistency import ConsistencyValidator
 from unittest.mock import MagicMock
 from wrappers.anoner_wrapper import AnonerWrapper
